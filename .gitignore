@@ -1,0 +1,26 @@
+# Data files
+*.db
+*.csv
+*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Credentials - NEVER commit real config
+config.py
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+profile.txt
+vimrc.txt
+pythonstartup.py

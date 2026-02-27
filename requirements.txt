@@ -1,0 +1,17 @@
+# Options Volume Scanner - Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core data fetching
+yfinance>=0.2.30
+
+# Data manipulation
+pandas>=2.0.0
+
+# HTML parsing (for S&P 500 list from Wikipedia)
+lxml>=4.9.0
+html5lib>=1.1
+
+# All other dependencies (sqlite3, smtplib, email) are part of Python standard library
+
+
+pandas_market_calendars>=4.0.0
