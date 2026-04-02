@@ -1,266 +1,89 @@
-# Options Volume Scanner 📊
+# Options Volume Scanner
 
-A Python tool that monitors unusual options trading volume on S&P 500 stocks to identify potential informed trading activity.
+**Python tool that monitors unusual options trading volume across S&P 500 stocks. Detects anomalies using statistical methods, adjusts for day-of-week patterns and earnings windows, and delivers daily HTML email reports.**
 
-## What It Does
+Options volume spikes can precede significant price moves. This scanner ingests daily options volume for the full S&P 500, compares it against rolling historical averages, and surfaces statistically significant anomalies — separating signal from routine earnings-driven noise.
 
-Every trading day, this scanner:
-1. **Collects** options volume data for all ~500 S&P 500 stocks
-2. **Analyzes** today's volume against historical averages
-3. **Detects** anomalies using statistical methods
-4. **Emails** you a report of any suspicious activity
+---
 
-The goal is to spot unusual options activity that *might* indicate someone trading on non-public information, similar to how regulators monitor for insider trading.
+## What It Detects
 
-## Features
+| Detection Method | Description |
+|-----------------|-------------|
+| **Standard Deviation Threshold** | Volume exceeding 2.5 std devs above rolling mean |
+| **Percentage Threshold** | Volume 200%+ above historical average |
+| **Day-of-Week Adjustment** | Normalizes for Friday expiry-driven volume spikes |
+| **Earnings Calendar Filter** | Excludes expected high-volume windows around earnings |
 
-- ✅ Pulls options data from Yahoo Finance (free)
-- ✅ Maintains historical database for comparison
-- ✅ Day-of-week volume adjustments
-- ✅ Earnings calendar awareness (filters expected high volume)
-- ✅ Dual detection: standard deviation AND percentage thresholds
-- ✅ Beautiful HTML email reports
-- ✅ SQLite database (no server required)
+Anomalies are ranked by severity and delivered via HTML email report, including today's volume, historical average, standard deviations above mean, and percentage above average.
 
-## Quick Start
+---
 
-### 1. Install Dependencies
+## Backtest Results: Signal Not Validated
+
+The unusual options volume signal was backtested against S&P 500 stocks from 2020 through 2025.
+
+**Result: t-statistic = -0.44 — not statistically significant.**
+
+The signal showed no consistent predictive edge in the 2025 regime. Options volume anomalies that historically preceded price moves appear to have been priced out as the market became more efficient at absorbing this information. This scanner is **archived as a research project**; no live trading strategy is deployed from it.
+
+The infrastructure (data pipeline, anomaly detection, database) remains production-quality and is available as a foundation for further research into options flow signals.
+
+---
+
+## Architecture
+
+```
+main.py               # Orchestrator — collect → analyze → email pipeline
+├── data_collector.py  # Pulls options volume from Yahoo Finance for S&P 500
+├── database.py        # SQLite storage and historical baseline queries
+├── analyzer.py        # Standard deviation + percentage anomaly detection
+├── emailer.py         # HTML email report builder + SMTP delivery
+└── config.py          # Thresholds and credentials (not committed)
+```
+
+---
+
+## Setup
 
 ```bash
+git clone https://github.com/KPH3802/options-volume-scanner.git
+cd options-volume-scanner
 pip install -r requirements.txt
-```
-
-### 2. Configure Email (Optional but Recommended)
-
-Edit `config.py` and set your Gmail credentials:
-
-```python
-EMAIL_SENDER = "your_email@gmail.com"
-EMAIL_PASSWORD = "xxxx xxxx xxxx xxxx"  # App Password, NOT your regular password!
-EMAIL_RECIPIENT = "your_email@gmail.com"
-```
-
-**Important:** You need a Gmail App Password, not your regular password:
-1. Go to https://myaccount.google.com/apppasswords
-2. Enable 2-Factor Authentication if not already enabled
-3. Create an App Password for "Mail"
-4. Copy the 16-character password
-
-### 3. Test Email Configuration
-
-```bash
-python main.py --test-email
-```
-
-### 4. Run Your First Collection
-
-```bash
-python main.py --collect
-```
-
-This will take ~15-30 minutes to fetch data for all 500 stocks.
-
-### 5. Check Status
-
-```bash
-python main.py --status
-```
-
-### 6. Run Full Pipeline
-
-```bash
+cp config_example.py config.py
 python main.py
+python main.py --collect       # Only collect today's data
+python main.py --analyze       # Only analyze existing data
+python main.py --no-email      # Run without sending email
+python main.py --status        # Show database status
+python main.py --test-email    # Send test email
 ```
 
-## Command Reference
-
-| Command | Description |
-|---------|-------------|
-| `python main.py` | Full pipeline: collect → analyze → email |
-| `python main.py --collect` | Only collect today's data |
-| `python main.py --analyze` | Only analyze existing data |
-| `python main.py --test-email` | Send test email |
-| `python main.py --status` | Show database status |
-| `python main.py --no-email` | Run without sending email |
-
-## Automation with PythonAnywhere (Recommended)
-
-PythonAnywhere is the easiest way to run this automatically every day.
-
-### Setup Steps
-
-1. **Create a free account** at [pythonanywhere.com](https://www.pythonanywhere.com)
-
-2. **Upload your files** via the Files tab:
-   - Upload all `.py` files
-   - Upload `requirements.txt`
-
-3. **Open a Bash console** and install dependencies:
-   ```bash
-   pip3 install --user -r requirements.txt
-   ```
-
-4. **Test the script**:
-   ```bash
-   cd ~/options_scanner
-   python3 main.py --status
-   python3 main.py --collect  # Run a test collection
-   ```
-
-5. **Set up scheduled task** (Tasks tab):
-   - Time: 21:30 UTC (4:30 PM ET, after market close)
-   - Command: `cd ~/options_scanner && python3 main.py`
-
-That's it! The script will run automatically every trading day.
-
-### PythonAnywhere Free Tier Limits
-
-- ✅ 1 scheduled task per day (perfect for us)
-- ✅ 512 MB disk space (plenty for SQLite)
-- ✅ Outbound internet access (for Yahoo Finance)
-- ⚠️ CPU limited to 100 seconds/day (usually enough)
-
-## Configuration Options
-
-All settings are in `config.py`:
-
-### Detection Thresholds
-
-```python
-# Flag if volume is this many standard deviations above mean
-STD_DEV_THRESHOLD = 2.5
-
-# Flag if volume is this percentage above average
-PERCENTAGE_THRESHOLD = 200  # 200% = 2x average
-
-# Minimum average volume to consider (filters illiquid options)
-MIN_AVERAGE_VOLUME = 100
-```
-
-### Historical Periods
-
-```python
-MIN_DAYS_FOR_AVERAGE = {
-    "1_week": 3,    # Need 3 days for 1-week average
-    "1_month": 10,  # Need 10 days for 1-month average
-    "3_month": 30,
-    "6_month": 60,
-}
-```
-
-### Day-of-Week Adjustments
-
-```python
-DAY_OF_WEEK_FACTORS = {
-    0: 1.05,  # Monday - slightly higher
-    1: 1.00,  # Tuesday - baseline
-    2: 1.00,  # Wednesday - baseline
-    3: 1.05,  # Thursday - slightly higher
-    4: 1.15,  # Friday - higher (weekly expiry)
-}
-```
-
-## Understanding the Output
-
-### Anomaly Report
-
-The email report includes:
-
-1. **Summary Stats** - How many tickers analyzed and anomalies found
-
-2. **Anomalies** - Stocks with suspicious volume:
-   - Today's volume
-   - Historical average
-   - Standard deviations above mean
-   - Percentage above average
-
-3. **Earnings-Related** - High volume near earnings (expected, not suspicious)
-
-### Example Alert
-
-```
-🚨 ANOMALY: CVX (Chevron)
-  Today's Volume: 450,000
-  1-Month Avg: 85,000
-  Deviation: 4.2 std devs
-  % Above Avg: 429%
-  Flags: 4.2 std devs above mean, 429% above average
-```
-
-## Database Schema
-
-The SQLite database (`options_data.db`) contains:
-
-- **daily_options_volume** - Daily volume data per ticker
-- **earnings_calendar** - Known earnings dates
-- **anomalies** - Historical record of detected anomalies
-- **sp500_tickers** - S&P 500 constituent tracking
-
-## Limitations & Disclaimers
-
-⚠️ **This is for educational/research purposes only.**
-
-- Yahoo Finance data has a ~15 minute delay
-- Not all unusual volume indicates insider trading
-- Many anomalies have legitimate explanations (news, analyst upgrades, etc.)
-- This tool cannot distinguish legal from illegal trading
-- Past anomaly patterns don't guarantee future predictive value
-
-## Troubleshooting
-
-### "No data collected"
-
-- Check your internet connection
-- Yahoo Finance may be rate-limiting you (wait and retry)
-- Weekend? Market is closed!
-
-### "Email failed to send"
-
-- Verify App Password is correct (not regular password)
-- Check 2FA is enabled on your Google account
-- Gmail may block "less secure apps" - use App Password
-
-### "Insufficient historical data"
-
-- Normal during ramp-up period
-- Wait a few more trading days
-- Analysis improves with more data
-
-## Future Enhancements
-
-Ideas for future development:
-
-- [ ] Put/Call ratio analysis
-- [ ] Open Interest changes
-- [ ] Near-term vs far-dated volume split
-- [ ] Sector-level aggregation
-- [ ] News correlation (check if anomaly preceded news)
-- [ ] Web dashboard for visualization
-- [ ] Backtesting against historical events
+### Requirements
+- Python 3.8+
+- Yahoo Finance access via yfinance (free, ~15 min delay)
+- Gmail account with App Password for alerts
 
 ---
 
-## Related Projects
+## Configuration
 
-This is part of a suite of quantitative research tools:
+Key thresholds in `config.py`:
 
-- [congress-trade-tracker](https://github.com/KPH3802/congress-trade-tracker) — Automated congressional stock trade tracking with 10 detection algorithms and 46K+ backtested signals
-- [form4-insider-scanner](https://github.com/KPH3802/form4-insider-scanner) — SEC Form 4 insider transaction detection with cluster scoring and cross-signal enrichment
-- [volatility-scanner](https://github.com/KPH3802/volatility-scanner) — IV rank, HV patterns, and term structure tracking across 500+ instruments
-- [natural-gas-weather-signals](https://github.com/KPH3802/natural-gas-weather-signals) — Weather-driven natural gas storage modeling and trading signals
-- [trading-utilities](https://github.com/KPH3802/trading-utilities) — Shared data pipeline: 13F filings, FRED data, price history, dividends, earnings, short interest
+```python
+STD_DEV_THRESHOLD = 2.5       # Flag if volume exceeds N std devs above mean
+PERCENTAGE_THRESHOLD = 200    # Flag if volume is N% above average
+MIN_AVERAGE_VOLUME = 100      # Filter illiquid options
+```
 
 ---
 
-## Connect
+## Disclaimer
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-kevin--heaney-blue?logo=linkedin)](https://www.linkedin.com/in/kevin-heaney/)
-[![Medium](https://img.shields.io/badge/Medium-@KPH3802-black?logo=medium)](https://medium.com/@KPH3802)
+This tool is for **educational and research purposes only**. Unusual options volume does not constitute evidence of insider trading or predictive information. This project does not constitute financial advice. Always do your own research.
+
+---
 
 ## License
 
-MIT License - Use freely, no warranty.
-
----
-
-*Built to explore whether unusual options activity has predictive value. Use responsibly.*
+MIT
